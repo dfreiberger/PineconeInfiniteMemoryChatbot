@@ -41,8 +41,7 @@ def gpt3_embedding(content, engine='text-embedding-ada-002'):
     return vector
 
 
-
-def gpt3_completion(prompt, engine='text-davinci-003', temp=0.0, top_p=1.0, tokens=400, freq_pen=0.0, pres_pen=0.0, stop=['USER:', 'RAVEN:']):
+def gpt3_completion(prompt, engine='text-davinci-003', temp=0.0, top_p=1.0, tokens=400, freq_pen=0.0, pres_pen=0.0, stop=['USER:', 'ENDER:']):
     max_retry = 5
     retry = 0
     prompt = prompt.encode(encoding='ASCII',errors='ignore').decode()
@@ -83,38 +82,52 @@ def load_conversation(results):
     return '\n'.join(messages).strip()
 
 
-if __name__ == '__main__':
-    convo_length = 30
-    openai.api_key = open_file('key_openai.txt')
-    pinecone.init(api_key=open_file('key_pinecone.txt'), environment='us-east1-gcp')
-    vdb = pinecone.Index("raven-mvp")
-    while True:
-        #### get user input, save it, vectorize it, save to pinecone
+class Chatbot:
+    def __init__(self, name: str, conversation_length: int = 30) -> None:
+        self._name = name
+        self._conversation_length = conversation_length
+
+        openai.api_key = open_file('key_openai.txt')
+        pinecone.init(api_key=open_file('key_pinecone.txt'), environment='us-east1-gcp')
+
+        self._vdb = pinecone.Index("test-chatbot")
+
+
+    def generate_nexus(self, speaker: str, message: str) -> str:
+        timestamp = time()
+        timestring = timestamp_to_datetime(timestamp)
+        unique_id = str(uuid4())
+        metadata = {'speaker': speaker, 'time': timestamp, 'message': message, 'timestring': timestring, 'uuid': unique_id}
+        save_json('nexus/%s.json' % unique_id, metadata)
+        vector = gpt3_embedding(message)
+        return unique_id, vector
+
+    def ask(self, message: str):
         payload = list()
-        a = input('\n\nUSER: ')
-        timestamp = time()
-        timestring = timestamp_to_datetime(timestamp)
-        #message = '%s: %s - %s' % ('USER', timestring, a)
-        message = a
-        vector = gpt3_embedding(message)
-        unique_id = str(uuid4())
-        metadata = {'speaker': 'USER', 'time': timestamp, 'message': message, 'timestring': timestring, 'uuid': unique_id}
-        save_json('nexus/%s.json' % unique_id, metadata)
+
+        # generate an embedding for the input message and save it
+        unique_id, vector = self.generate_nexus('USER', message)
         payload.append((unique_id, vector))
-        #### search for relevant messages, and generate a response
-        results = vdb.query(vector=vector, top_k=convo_length)
-        conversation = load_conversation(results)  # results should be a DICT with 'matches' which is a LIST of DICTS, with 'id'
-        prompt = open_file('prompt_response.txt').replace('<<CONVERSATION>>', conversation).replace('<<MESSAGE>>', a)
-        #### generate response, vectorize, save, etc
-        output = gpt3_completion(prompt)
-        timestamp = time()
-        timestring = timestamp_to_datetime(timestamp)
-        #message = '%s: %s - %s' % ('RAVEN', timestring, output)
-        message = output
-        vector = gpt3_embedding(message)
-        unique_id = str(uuid4())
-        metadata = {'speaker': 'RAVEN', 'time': timestamp, 'message': message, 'timestring': timestring, 'uuid': unique_id}
-        save_json('nexus/%s.json' % unique_id, metadata)
+
+        # search for relevant messages and load from nexus files
+        results = self._vdb.query(vector=vector, top_k=self._conversation_length)
+        conversation = load_conversation(results)  
+        prompt = open_file('prompt_response.txt').replace('<<CONVERSATION>>', conversation).replace('<<MESSAGE>>', message)
+
+        # generate response, vectorize, save, etc
+        chatbot_response = gpt3_completion(prompt)
+
+        unique_id, vector = self.generate_nexus(self._name, chatbot_response)
         payload.append((unique_id, vector))
-        vdb.upsert(payload)
-        print('\n\nRAVEN: %s' % output) 
+
+        self._vdb.upsert(payload)
+
+        return chatbot_response
+
+if __name__ == '__main__':
+    chatbot = Chatbot("ENDER", 30)
+
+    while True:
+        message = input('\n\nUSER: ')
+        output = chatbot.ask(message)
+        print('\n\nENDER: %s' % output) 

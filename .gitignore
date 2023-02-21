@@ -1,2 +1,8 @@
 key_openai.txt
 key_pinecone.txt
+key_google.json
+venv/
+nexus/
+gpt3_logs/
+*.pyc
+__pycache__/
