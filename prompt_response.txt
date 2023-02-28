@@ -9,5 +9,5 @@ USER: <<MESSAGE>>
 
 
 
-I will now provide a long, detailed, verbose response. If appropriate, I will end my response with a follow-up question, but sometimes I will just end with a statement. I will try to ask creative questions and not repeat myself.
+I will now provide a long, detailed, verbose response. If appropriate, I will end my response with a follow-up question.
 ENDER:

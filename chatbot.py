@@ -58,7 +58,7 @@ class Chatbot:
             info = load_json('nexus/%s.json' % m['id'])
             result.append(info)
         ordered = sorted(result, key=lambda d: d['time'], reverse=False)  # sort them all chronologically
-        messages = [i['message'] for i in ordered]
+        messages = [i['speaker'].lower() + ': ' + i['message'] for i in ordered]
         return '\n'.join(messages).strip()
         
     def generate_nexus(self, speaker: str, message: str) -> str:
